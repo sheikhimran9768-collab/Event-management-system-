@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>📅 Events Dashboard ({{ events|length }})</h1>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('create_event') }}" class="btn btn-primary btn-lg">
+            ➕ Create New Event
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for event in events %}
+    <div class="col-xl-4 col-lg-6 col-md-6">
+        <div class="card h-100 shadow-sm event-card">
+            <div class="card-header bg-transparent border-0 pt-3">
+                <div class="d-flex justify-content-between">
+                    <h5 class="card-title mb-0 fw-bold">{{ event.title }}</h5>
+                    <span class="badge bg-{{ 'success' if event.status == 'upcoming' else 'warning' if event.status == 'ongoing' else 'secondary' if event.status == 'completed' else 'danger' }} fs-6">
+                        {{ event.status.title() }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body pb-3">
+                {% if event.description %}
+                <p class="card-text text-muted small">{{ event.description[:120] }}{% if event.description|length > 120 %}...{% endif %}</p>
+                {% endif %}
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="fw-bold text-primary fs-5">{{ event.event_date.strftime('%d %b') }}</div>
+                        <div class="text-muted small">{{ event.event_date.strftime('%H:%M') }}</div>
+                    </div>
+                    <div class="col-6">
+                        {% if event.price and event.price > 0 %}
+                        <div class="fw-bold text-success fs-4">${{ "%.2f"|format(event.price) }}</div>
+                        <div class="text-muted small">per ticket</div>
+                        {% else %}
+                        <div class="fw-bold text-success fs-4">FREE</div>
+                        <div class="text-muted small">No cost</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if event.location %}
+                <hr class="my-3">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-geo-alt-fill text-primary me-2"></i>
+                    <span class="small">{{ event.location }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-transparent pt-0 border-0">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                    <a href="{{ url_for('edit_event', id=event.id) }}" class="btn btn-outline-primary btn-sm">
+                        ✏️ Edit
+                    </a>
+                    <a href="{{ url_for('delete_event', id=event.id) }}" 
+                       class="btn btn-outline-danger btn-sm" 
+                       onclick="return confirm('Are you sure you want to delete {{ event.title }}?')">
+                        🗑️ Delete
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not events %}
+<div class="text-center py-5">
+    <i class="bi bi-calendar-event display-1 text-muted mb-4"></i>
+    <h3>No events yet</h3>
+    <p class="text-muted">Create your first event to get started!</p>
+    <a href="{{ url_for('create_event') }}" class="btn btn-primary btn-lg">🚀 Create First Event</a>
+</div>
+{% endif %}
+{% endblock %}

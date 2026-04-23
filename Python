@@ -1,0 +1,117 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, DateTimeLocalField, IntegerField, FloatField, SelectField
+from wtforms.validators import DataRequired, Optional
+from datetime import datetime, date
+import os
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'eventmanager2024-supersecretkey!'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# Database Model
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    event_date = db.Column(db.DateTime, nullable=False)
+    location = db.Column(db.String(200))
+    organizer = db.Column(db.String(100))
+    capacity = db.Column(db.Integer)
+    price = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(20), default='upcoming')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'event_date': self.event_date.isoformat(),
+            'location': self.location,
+            'organizer': self.organizer,
+            'capacity': self.capacity,
+            'price': self.price,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
+        }
+
+# Create DB tables
+with app.app_context():
+    db.create_all()
+
+# Forms
+class EventForm(FlaskForm):
+    title = StringField('Event Title', validators=[DataRequired()])
+    description = TextAreaField('Description', validators=[Optional()])
+    event_date = DateTimeLocalField('Event Date & Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    location = StringField('Location', validators=[Optional()])
+    organizer = StringField('Organizer', validators=[Optional()])
+    capacity = IntegerField('Capacity', validators=[Optional()])
+    price = FloatField('Price ($)', validators=[Optional()])
+    status = SelectField('Status', choices=[
+        ('upcoming', 'Upcoming'),
+        ('ongoing', 'Ongoing'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled')
+    ], default='upcoming')
+
+@app.route('/')
+def index():
+    events = Event.query.order_by(Event.event_date.desc()).all()
+    return render_template('index.html', events=events)
+
+@app.route('/create', methods=['GET', 'POST'])
+def create_event():
+    form = EventForm()
+    if form.validate_on_submit():
+        event = Event(
+            title=form.title.data,
+            description=form.description.data,
+            event_date=form.event_date.data,
+            location=form.location.data,
+            organizer=form.organizer.data,
+            capacity=form.capacity.data,
+            price=form.price.data or 0.0,
+            status=form.status.data
+        )
+        db.session.add(event)
+        db.session.commit()
+        flash('🎉 Event created successfully!', 'success')
+        return redirect(url_for('index'))
+    return render_template('create.html', form=form)
+
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+def edit_event(id):
+    event = Event.query.get_or_404(id)
+    form = EventForm(obj=event)
+    
+    if form.validate_on_submit():
+        form.populate_obj(event)
+        event.price = form.price.data or 0.0
+        db.session.commit()
+        flash('✅ Event updated successfully!', 'success')
+        return redirect(url_for('index'))
+    
+    form.event_date.data = event.event_date
+    return render_template('edit.html', form=form, event=event)
+
+@app.route('/delete/<int:id>')
+def delete_event(id):
+    event = Event.query.get_or_404(id)
+    db.session.delete(event)
+    db.session.commit()
+    flash('🗑️ Event deleted successfully!', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/api/events')
+def api_events():
+    events = Event.query.all()
+    return jsonify([event.to_dict() for event in events])
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
